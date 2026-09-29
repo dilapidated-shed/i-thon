@@ -13,7 +13,7 @@ message; it never buffers the complete mailbox.
 | --- | --- | --- |
 | 1a | committed synthetic byte-exact mbox fixtures | PASS with ordinary DMD 2.111.0 |
 | 1b | 47+ retained CPython `Lib/test/test_email/data/msg_*.txt` fixtures | PASS; each parse retained the complete source range |
-| 1c | direct DMD command build of tests and streaming index command | PASS |
+| 1c | direct DMD command build of tests and streaming index command | PASS locally and in the branch workflow |
 | 2 | small real exported mbox sample | PENDING; no export-safe sample was available in this execution environment |
 | 3 | bounded SDF byte/message sample | PENDING; this execution environment had no authenticated SDF read path |
 | 4 | complete large SDF mailbox | PENDING until stages 2 and 3 pass |
@@ -23,5 +23,6 @@ The focused command compiled `model.d`, `mbox.d`, `mime.d`, and
 executable reported `1 modules passed unittests`. A separate DMD build produced
 the streaming `sdf-mailbox-email` index command.
 
-No GitHub workflow run was attached to the published head during this
-verification, so this receipt claims local DMD execution only.
+The branch `translated-tests` and repository `lint` checks both completed
+successfully after publication. The workflow uses ordinary DMD with warnings
+enabled and pins its actions by commit.
