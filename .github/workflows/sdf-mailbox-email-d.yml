@@ -16,6 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
       - uses: dlang-community/setup-dlang@a6f7969b8b5dc3ff448c30f2c6749150795814f3 # v2
         with:
           compiler: dmd-latest
