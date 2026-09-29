@@ -2,28 +2,26 @@
 
 ## Safety boundary
 
-No SDF mailbox was opened for write, renamed, deleted, or altered.  The reader
-opens a source only for bounded reads.  `scanMbox` retains source offsets and
-one physical line at a time; `copyLogicalRfcMessage` seeks to one record and
-copies it line by line.
+No SDF mailbox was opened for write, renamed, deleted, or altered. `scanMbox`
+keeps one physical line and one range record. `copyLogicalRfcMessage` seeks to
+one bounded record and copies it line by line. MIME inspection buffers one
+message; it never buffers the complete mailbox.
 
-## Progressive acceptance sequence
+## Progressive acceptance
 
 | Stage | Input | Result |
 | --- | --- | --- |
-| 1 | committed synthetic fixtures | passed locally with ordinary DMD 2.111.0 (and LDC 1.36 as a compatibility diagnostic); the command produced the checked-in `fixtures/translated-results.md` |
-| 2 | small real exported mbox sample | pending user-provided/export-safe sample; no substitution made |
-| 3 | bounded SDF byte or message sample | pending explicit SDF read path and bound; source remains read-only |
-| 4 | large SDF mailbox | intentionally deferred until stages 1–3 pass |
+| 1a | committed synthetic byte-exact mbox fixtures | PASS with ordinary DMD 2.111.0 |
+| 1b | 47+ retained CPython `Lib/test/test_email/data/msg_*.txt` fixtures | PASS; each parse retained the complete source range |
+| 1c | direct DMD command build of tests and streaming index command | PASS |
+| 2 | small real exported mbox sample | PENDING; no export-safe sample was available in this execution environment |
+| 3 | bounded SDF byte/message sample | PENDING; this execution environment had no authenticated SDF read path |
+| 4 | complete large SDF mailbox | PENDING until stages 2 and 3 pass |
 
-The local environment did not provide DMD or DUB, so ordinary DMD 2.111.0 was
-downloaded from the official D release archive into `/tmp` solely for this
-verification.  It compiled both the unit-test executable and the streaming
-command, then ran the stage-1 fixtures successfully.  The independent branch
-was published through the connected GitHub interface at commit
-`e5d26479e74ca5f1f82b7788b3f7657fc7c732e6`:
-https://github.com/dilapidated-shed/i-thon/tree/d/sdf-mailbox-email .  The
-ordinary HTTPS push still has no local credentials, but that did not alter the
-published result.  GitHub had reported no workflow status for this commit when
-this receipt was updated.  This receipt does not claim remote CI or a
-large-mailbox acceptance before the bounded stages exist.
+The focused command compiled `model.d`, `mbox.d`, `mime.d`, and
+`translated_mailbox_email.d` with `dmd -unittest -Isource`. The resulting
+executable reported `1 modules passed unittests`. A separate DMD build produced
+the streaming `sdf-mailbox-email` index command.
+
+No GitHub workflow run was attached to the published head during this
+verification, so this receipt claims local DMD execution only.

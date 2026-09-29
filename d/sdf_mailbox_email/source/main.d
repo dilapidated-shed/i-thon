@@ -16,7 +16,7 @@ int main(string[] arguments) {
         scanMbox(source, MboxDialect.mboxRd, (in MboxRecord record) {
             stdout.writeln(++number, '\t', record.sourceMessage.start, '\t',
                     record.sourceMessage.end, '\t', record.messageBody.start, '\t',
-                    record.messageBody.end, '\t', record.boundaryWasAmbiguous ? "ambiguous" : "first");
+                    record.messageBody.end, '\t', record.envelopeSender);
         });
         return 0;
     } catch (Exception error) {

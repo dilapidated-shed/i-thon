@@ -8,15 +8,21 @@ enum MboxDialect {
 }
 
 enum DefectKind {
-    malformedHeader,
+    invalidHeader,
     missingHeaderBodySeparator,
     firstHeaderLineIsContinuation,
-    missingMultipartBoundary,
-    missingClosingMultipartBoundary,
-    invalidBase64,
+    misplacedEnvelopeHeader,
+    noBoundaryInMultipart,
+    startBoundaryNotFound,
+    closeBoundaryNotFound,
+    invalidMultipartContentTransferEncoding,
+    excessiveMimeNesting,
+    invalidBase64Characters,
+    invalidBase64Padding,
+    invalidBase64Length,
     invalidQuotedPrintable,
-    ambiguousMboxBoundary,
-    unsupportedContentLengthFraming,
+    invalidEncodedWord,
+    unknownCharset,
 }
 
 struct ByteRange {
@@ -42,21 +48,27 @@ struct Header {
 // mailbox.  It excludes the mbox From_ separator.  messageBody begins after
 // the embedded header/body separator and is still in source coordinates.
 struct MboxRecord {
+    ulong key;
     ByteRange separator;
     ByteRange sourceMessage;
     ByteRange headers;
     ByteRange messageBody;
     string envelopeSender;
-    bool boundaryWasAmbiguous;
-    uint rejectedSeparatorCandidates;
+    bool separatorPrecededByBlankLine;
 }
 
 struct MimePart {
     Header[] headers;
     ByteRange source;
     ByteRange body;
+    ByteRange preamble;
+    ByteRange epilogue;
+    bool hasPreamble;
+    bool hasEpilogue;
     string contentType;
     string transferEncoding;
+    string contentDisposition;
+    string charset;
     string filename;
     MimePart[] children;
     Defect[] defects;

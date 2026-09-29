@@ -1,14 +1,13 @@
 # Byte-exact mbox fixtures
 
-Each `.mbox` file is an original physical mailbox byte sequence, committed
-unchanged.  The companion `expected.md` records the physical offsets and the
-logical RFC-message result after the one mboxrd unescape mandated by the
-format; `translated-results.md` retains the actual command result.  Fixtures use LF deliberately: the translated reader also accepts
-CRLF physical lines, and the tests cover MIME folding independently.
+Each `.mbox` file is a physical mailbox byte sequence committed unchanged.
+`expected.md` records zero-based half-open ranges and logical mboxrd results.
+`translated-results.md` records the D command output.
 
-`ambiguous-from.mbox` distinguishes an escaped body `>From ` line, a
-postmark-shaped body line followed by a non-header (not a separator), and a
-postmark-shaped line followed by a header (a separator).
+`ambiguous-from.mbox` proves the retained CPython rule. The escaped
+`>From ` body line stays in its message, while each unescaped physical
+`From ` line starts another message regardless of date validity or the next
+line's shape.
 
-`folded-multipart.mbox` retains a folded RFC header, multipart framing, a
-base64 attachment, and the exact raw body bytes.
+`folded-multipart.mbox` retains a folded header, multipart framing, a base64
+attachment, and exact raw body bytes.

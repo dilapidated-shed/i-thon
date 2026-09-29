@@ -1,25 +1,27 @@
 # Feature-parity record
 
-This record measures the retained read-only SDF mbox slice against the CPython
-sources identified in `PROVENANCE.md`.
+This table covers the retained read-only SDF mailbox/message path identified in
+`PROVENANCE.md`.
 
-| CPython behavior | D module | Evidence |
+| Retained behavior | D implementation | Evidence |
 | --- | --- | --- |
-| Stream physical input without loading mailbox | `sdfmail.mbox.scanMbox` | one `File.readln` physical line; records are ranges |
-| traditional mbox `From ` framing | `sdfmail.mbox` postmark and pending-state logic | ambiguous fixture and translated test |
-| escaped mboxrd `From ` | `unquoteMboxRd`, `copyLogicalRfcMessage` | byte-preservation assertion |
-| exact physical offsets | `ByteRange` / `MboxRecord` | fixture offsets and assertions |
-| logical raw RFC preservation | `copyLogicalRfcMessage` | range-copy algorithm and fixture evidence |
-| normal and folded headers | `sdfmail.mime.parseHeaderBlock` | multipart translated test |
-| MIME multipart tree and attachment metadata | `sdfmail.mime.parseMessage` | multipart translated test |
-| base64 and quoted-printable | `sdfmail.mime.decodeBody` | attachment and malformed-encoding tests |
-| malformed-message retention | defects in `sdfmail.model` and parser | malformed-header test |
-| EOF distinctions | mbox scan finalization and MIME missing-separator/closing-boundary defects | translated tests and fixture EOF record |
+| Incremental mailbox scan | `scanMbox` holds one physical line and one record | large input size does not determine scan memory |
+| CPython mbox `From ` rule | every physical line beginning `From ` starts a record | adversarial fixture produces three records |
+| bytes before first separator | ignored as CPython does | translated test |
+| blank separator line handling | one LF-only empty line before a boundary/EOF is excluded | translated test |
+| mboxrd and mboxo logical bytes | one protective `>` removed only for mboxrd body lines | byte assertions for both dialects |
+| exact physical offsets | separator, embedded RFC, headers, and body use half-open source ranges | committed fixture assertions |
+| raw RFC preservation | bounded copy streams directly from the source range | round-trip tests |
+| ordinary, duplicate, and folded headers | ordered header array with source ranges and unfolding | translated tests |
+| RFC 2047 common encoded words | Q and B decoding, adjacent-word whitespace rule, explicit charset defect | translated tests |
+| MIME parameters and attachments | quoted parameters, escaped quoted text, RFC 2231 single extended values, filename/name | multipart fixture and tests |
+| multipart structure | nesting, digest defaults, preamble, epilogue, exact boundary suffix checks | translated tests |
+| encapsulated messages | `message/rfc822` becomes a child message | translated test |
+| transfer encodings | 7bit/8bit/binary pass-through, base64, quoted-printable | valid and malformed tests |
+| malformed input | typed defects retain the raw source instead of dropping the message | CPython defect cases |
+| EOF | final unterminated line/message is emitted; empty/non-mbox input emits no records | translated tests |
+| input error | D `File` read/seek/write errors remain errors and do not become EOF | direct `File` operations, no catch-and-relabel path |
 
-The current D API intentionally exposes parsed structure separately from raw
-bytes.  Parsing never replaces the recorded physical message range; Gmail
-import can use the logical raw stream while tools inspect the MIME tree.
-
-Features outside the retained SDF scope are listed explicitly in
-`INTENTIONALLY_DISCARDED.md`; none are silently substituted with another mail
-library.
+MIME inspection consumes one bounded RFC message buffer. Mailbox enumeration
+and Gmail-bound raw copying remain streaming and never materialize the complete
+mailbox.

@@ -5,9 +5,7 @@ import std.stdio : File;
 
 import sdfmail.model;
 
-private enum ScanState { first, headers, body, pending }
-
-private bool isDigit(ubyte c) { return c >= '0' && c <= '9'; }
+private enum ScanState { beforeFirst, headers, body }
 
 private bool startsWith(scope const(ubyte)[] value, string prefix) {
     if (value.length < prefix.length) return false;
@@ -15,79 +13,8 @@ private bool startsWith(scope const(ubyte)[] value, string prefix) {
     return true;
 }
 
-private int decimal(scope const(ubyte)[] value) {
-    if (value.length == 0 || value.length > 4) return -1;
-    int result;
-    foreach (c; value) {
-        if (!isDigit(c)) return -1;
-        result = result * 10 + c - '0';
-    }
-    return result;
-}
-
-private bool oneOf(scope const(ubyte)[] value, scope const(string)[] choices) {
-    foreach (choice; choices) {
-        if (value.length != choice.length) continue;
-        bool equal = true;
-        foreach (i, c; choice) if (value[i] != c) equal = false;
-        if (equal) return true;
-    }
-    return false;
-}
-
-// This is intentionally the same conservative shape check used by the prior
-// D indexer: a bare From_ line alone is never enough evidence for a boundary.
-private bool postmark(scope const(ubyte)[] line) {
-    if (line.length == 0 || line[$ - 1] != '\n') return false;
-    if (line.length >= 2 && line[$ - 2] == '\r') line = line[0 .. $ - 2];
-    else line = line[0 .. $ - 1];
-    if (!startsWith(line, "From ")) return false;
-
-    size_t cursor = 5;
-    while (cursor < line.length && line[cursor] != ' ') cursor++;
-    if (cursor == 5 || cursor == line.length) return false;
-    cursor++;
-    while (cursor < line.length && line[cursor] == ' ') cursor++;
-    if (cursor + 3 >= line.length || !oneOf(line[cursor .. cursor + 3],
-            ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"])) return false;
-    cursor += 3;
-    if (cursor >= line.length || line[cursor++] != ' ') return false;
-    if (cursor + 3 >= line.length || !oneOf(line[cursor .. cursor + 3],
-            ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])) return false;
-    cursor += 3;
-    if (cursor >= line.length || line[cursor++] != ' ') return false;
-    while (cursor < line.length && line[cursor] == ' ') cursor++;
-    auto dayStart = cursor;
-    while (cursor < line.length && isDigit(line[cursor])) cursor++;
-    auto day = decimal(line[dayStart .. cursor]);
-    if (day < 1 || day > 31 || cursor >= line.length || line[cursor++] != ' ') return false;
-    if (cursor + 8 > line.length) return false;
-    auto time = line[cursor .. cursor + 8];
-    if (time[2] != ':' || time[5] != ':' || decimal(time[0 .. 2]) > 23 ||
-            decimal(time[3 .. 5]) > 59 || decimal(time[6 .. 8]) > 60) return false;
-    cursor += 8;
-    if (cursor >= line.length || line[cursor++] != ' ') return false;
-    while (cursor < line.length && line[cursor] == ' ') cursor++;
-    auto tokenStart = cursor;
-    while (cursor < line.length && line[cursor] != ' ') cursor++;
-    if (decimal(line[tokenStart .. cursor]) >= 1900 && cursor == line.length) return true;
-    while (cursor < line.length && line[cursor] == ' ') cursor++;
-    return cursor + 4 == line.length && decimal(line[cursor .. $]) >= 1900;
-}
-
 private bool blank(scope const(ubyte)[] line) {
     return line == cast(const(ubyte)[]) "\n" || line == cast(const(ubyte)[]) "\r\n";
-}
-
-private bool headerField(scope const(ubyte)[] line) {
-    size_t i;
-    while (i < line.length && line[i] != ':') {
-        auto c = line[i];
-        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
-                (c >= '0' && c <= '9') || c == '-')) return false;
-        i++;
-    }
-    return i > 0 && i < line.length;
 }
 
 private string sender(scope const(ubyte)[] separator) {
@@ -98,30 +25,30 @@ private string sender(scope const(ubyte)[] separator) {
     return result.idup;
 }
 
-// Scan only holds one physical line at a time.  It records source byte ranges
-// rather than materializing messages or the mailbox.  The caller can reopen a
-// bounded source range later for MIME parsing or Gmail import.
+// This is the read-only translation of mailbox.mbox._generate_toc.  CPython
+// deliberately recognizes every physical line beginning "From " as a new
+// message.  It does not validate the sender, date, or following header.  A
+// valid mboxrd producer must quote body lines of that shape.
 void scanMbox(ref File source, MboxDialect dialect,
         scope void delegate(in MboxRecord) emit) {
     enforce(dialect == MboxDialect.mboxRd || dialect == MboxDialect.mboxO,
             "sdf-mailbox-email: mboxcl and mboxcl2 Content-Length framing were intentionally discarded for the SDF mbox path");
-    auto state = ScanState.first;
+    auto state = ScanState.beforeFirst;
     MboxRecord record;
     ulong position;
     ulong lineStart;
-    ulong pendingStart;
-    ulong pendingEnd;
-    ubyte[] pendingSeparator;
-    ScanState pendingPrevious;
+    ulong nextKey;
+    bool lastWasEmpty;
 
     void begin(ulong separatorStart, ulong separatorEnd, scope const(ubyte)[] line,
-            bool ambiguous) {
+            bool precededByBlankLine) {
         record = MboxRecord.init;
+        record.key = nextKey++;
         record.separator = ByteRange(separatorStart, separatorEnd);
         record.sourceMessage.start = separatorEnd;
         record.headers.start = separatorEnd;
         record.envelopeSender = sender(line);
-        record.boundaryWasAmbiguous = ambiguous;
+        record.separatorPrecededByBlankLine = precededByBlankLine;
         state = ScanState.headers;
     }
 
@@ -142,57 +69,30 @@ void scanMbox(ref File source, MboxDialect dialect,
             record.messageBody.start = end;
         }
         record.messageBody.end = end;
-    }
-
-    void considerSeparator(scope const(ubyte)[] line, ulong start, ulong end) {
-        pendingStart = start;
-        pendingEnd = end;
-        pendingSeparator = line.dup;
-        pendingPrevious = state;
-        state = ScanState.pending;
-    }
-
-    void accept(scope const(ubyte)[] line, ulong start, ulong end) {
-        final switch (state) {
-            case ScanState.first:
-                enforce(postmark(line), "sdf-mailbox-email: first line is not an mbox From_ separator");
-                begin(start, end, line, false);
-                break;
-            case ScanState.headers:
-                if (postmark(line)) considerSeparator(line, start, end);
-                else consumeHeader(line, start, end);
-                break;
-            case ScanState.body:
-                if (postmark(line)) considerSeparator(line, start, end);
-                break;
-            case ScanState.pending:
-                if (headerField(line)) {
-                    state = pendingPrevious;
-                    finish(pendingStart);
-                    emit(record);
-                    begin(pendingStart, pendingEnd, pendingSeparator, true);
-                    consumeHeader(line, start, end);
-                } else {
-                    record.rejectedSeparatorCandidates++;
-                    state = pendingPrevious;
-                    accept(line, start, end);
-                }
-                break;
-        }
+        emit(record);
     }
 
     while (true) {
         auto line = source.readln();
         if (line.length == 0) break;
         position += line.length;
-        accept(cast(const(ubyte)[]) line, lineStart, position);
+        auto bytes = cast(const(ubyte)[]) line;
+        if (startsWith(bytes, "From ")) {
+            if (state != ScanState.beforeFirst) {
+                auto stop = lastWasEmpty ? lineStart - 1 : lineStart;
+                finish(stop);
+            }
+            begin(lineStart, position, bytes, lastWasEmpty);
+            lastWasEmpty = false;
+        } else if (state != ScanState.beforeFirst) {
+            if (state == ScanState.headers) consumeHeader(bytes, lineStart, position);
+            lastWasEmpty = bytes == cast(const(ubyte)[]) "\n";
+        }
         lineStart = position;
     }
-    if (state == ScanState.pending) record.rejectedSeparatorCandidates++;
-    if (state != ScanState.first) {
-        if (state == ScanState.pending) state = pendingPrevious;
-        finish(position);
-        emit(record);
+    if (state != ScanState.beforeFirst) {
+        auto stop = lastWasEmpty ? position - 1 : position;
+        finish(stop);
     }
 }
 
