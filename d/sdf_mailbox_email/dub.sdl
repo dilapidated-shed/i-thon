@@ -1,0 +1,7 @@
+name "sdf-mailbox-email"
+description "Streaming, byte-preserving mbox and RFC/MIME reader translated from CPython's retained mailbox and email path"
+targetType "executable"
+targetPath "build"
+targetName "sdf-mailbox-email"
+sourcePaths "source"
+mainSourceFile "source/main.d"

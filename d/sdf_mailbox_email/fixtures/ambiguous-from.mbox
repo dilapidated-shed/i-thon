@@ -1,0 +1,13 @@
+From alice@example.invalid Mon Jan  1 00:00:00 2024
+From: Alice <alice@example.invalid>
+Subject: first
+
+ordinary body line
+>From escaped body line
+From nobody Mon Jan  1 00:00:01 2024
+this is body text, not a header
+From bob@example.invalid Tue Jan  2 03:04:05 2024
+From: Bob <bob@example.invalid>
+Subject: second
+
+second body

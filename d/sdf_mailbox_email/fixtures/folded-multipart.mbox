@@ -1,0 +1,18 @@
+From mime@example.invalid Wed Jan  3 04:05:06 2024
+From: MIME <mime@example.invalid>
+Subject: folded
+ subject
+Content-Type: multipart/mixed; boundary="outer"
+
+preamble
+--outer
+Content-Type: text/plain
+
+plain text
+--outer
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Disposition: attachment; filename="two-bytes.bin"
+
+AAE=
+--outer--
