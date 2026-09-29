@@ -19,8 +19,11 @@ copies it line by line.
 The local environment did not provide DMD or DUB, so ordinary DMD 2.111.0 was
 downloaded from the official D release archive into `/tmp` solely for this
 verification.  It compiled both the unit-test executable and the streaming
-command, then ran the stage-1 fixtures successfully.  Branch publication is
-pending GitHub credentials—the HTTPS remote rejected the push and the connected
-GitHub branch-creation call timed out without confirming a remote ref.  This
-receipt does not claim remote CI or a large-mailbox acceptance before the
-bounded stages exist.
+command, then ran the stage-1 fixtures successfully.  The independent branch
+was published through the connected GitHub interface at commit
+`e5d26479e74ca5f1f82b7788b3f7657fc7c732e6`:
+https://github.com/dilapidated-shed/i-thon/tree/d/sdf-mailbox-email .  The
+ordinary HTTPS push still has no local credentials, but that did not alter the
+published result.  GitHub had reported no workflow status for this commit when
+this receipt was updated.  This receipt does not claim remote CI or a
+large-mailbox acceptance before the bounded stages exist.
